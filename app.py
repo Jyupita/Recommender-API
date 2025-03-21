@@ -13,6 +13,10 @@ model = tf.keras.models.load_model("C:/Users/kl/Desktop/Test project/novel_recom
 # Load book dataset (modify this path based on your data)
 books_df = pd.read_csv("C:/Users/kl/Desktop/Test project/books_cleaned.csv")  # Make sure this contains book titles and IDs
 
+# Shopify API details
+SHOPIFY_STORE_URL = "https://r0ydah-w3.myshopify.com/api/2023-10/graphql.json"
+SHOPIFY_ACCESS_TOKEN = "a221a23fbb36e3ec9a15e4e64d492b98"
+
 app = Flask(__name__)
 
 # Function to get book recommendations
@@ -26,6 +30,37 @@ def recommend_books(book_title):
     recommended_books = books_df.iloc[recommended_indices]['title'].tolist()
 
     return recommended_books
+
+
+# Function to fetch book details from Shopify
+def fetch_book_details(book_titles):
+    query = """
+    query GetBooks($bookTitles: [String!]) {
+      products(first: 5, query: $bookTitles) {
+        edges {
+          node {
+            id
+            title
+            description
+            images(first: 1) { edges { node { url } } }
+            priceRange { minVariantPrice { amount currencyCode } }
+          }
+        }
+      }
+    }
+    """
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Storefront-Access-Token": SHOPIFY_ACCESS_TOKEN
+    }
+    variables = {"bookTitles": book_titles}
+    
+    response = requests.post(SHOPIFY_STORE_URL, json={"query": query, "variables": variables}, headers=headers)
+    
+    if response.status_code == 200:
+        return response.json().get("data", {}).get("products", {}).get("edges", [])
+    else:
+        return []
 
 # API endpoint
 @app.route("/recommend", methods=["POST"])
